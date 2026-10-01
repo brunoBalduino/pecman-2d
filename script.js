@@ -1,1106 +1,1126 @@
-const canvas =
-    document.getElementById("gameCanvas");
+"use strict";
 
-const ctx =
-    canvas.getContext("2d");
+/* =========================================================
+CANVAS
+========================================================= */
 
-
-/* =====================================================
-   ELEMENTOS DA INTERFACE
-===================================================== */
-
-const score1 =
-    document.getElementById("score1");
-
-const score2 =
-    document.getElementById("score2");
-
-const lives1 =
-    document.getElementById("lives1");
-
-const lives2 =
-    document.getElementById("lives2");
-
-const statusText =
-    document.getElementById("status");
-
-const levelText =
-    document.getElementById("level");
-
-const restartButton =
-    document.getElementById("restartButton");
-
-const message =
-    document.getElementById("message");
-
-const messageIcon =
-    document.getElementById("messageIcon");
-
-const messageTitle =
-    document.getElementById("messageTitle");
-
-const messageText =
-    document.getElementById("messageText");
-
-const messageButton =
-    document.getElementById("messageButton");
-
-
-/* =====================================================
-   CONFIGURAÇÃO
-===================================================== */
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
 const TILE = 32;
-
-const COLS = 30;
-
+const COLS = 28;
 const ROWS = 20;
 
 const WIDTH = COLS * TILE;
-
 const HEIGHT = ROWS * TILE;
 
 canvas.width = WIDTH;
-
 canvas.height = HEIGHT;
 
+/* =========================================================
+INTERFACE
+========================================================= */
 
-/* =====================================================
-   MAPA
+const score1Element = document.getElementById("score1");
+const score2Element = document.getElementById("score2");
 
-   # = parede
-   . = orb
-   o = power-up
-   P = portal
-   espaço = caminho
-===================================================== */
+const lives1Element = document.getElementById("lives1");
+const lives2Element = document.getElementById("lives2");
 
-const mapTemplate = [
+const statusElement = document.getElementById("statusText");
+const levelElement = document.getElementById("levelText");
 
-"##############################",
-"#............##..............#",
-"#.####.#####.##.#####.####...#",
-"#o####.#####.##.#####.####.o.#",
-"#............................#",
-"#.####.##.##########.##.####.#",
-"#......##....####....##......#",
-"######.#####.####.#####.######",
-"#............P..P............#",
-"#.####.#####......#####.####.#",
-"#......#..............#......#",
-"####.###.####.##.####.###.###",
-"#...........#....#...........#",
-"#.#####.###.#.##.#.###.#####.#",
-"#o....#.....#....#.....#....o#",
-"#####.#.###.######.###.#.#####",
-"#............................#",
-"#.####.#####.####.#####.####.#",
-"#............................#",
-"##############################"
+const restartButton = document.getElementById("restartBtn");
 
+const overlay = document.getElementById("overlay");
+
+const resultIcon = document.getElementById("resultIcon");
+const resultTitle = document.getElementById("resultTitle");
+const resultText = document.getElementById("resultText");
+const resultButton = document.getElementById("resultBtn");
+
+/* =========================================================
+MAPA
+
+= parede
+. = orb
+o = power-up
+P = portal
+espaço = corredor
+
+O mapa possui exatamente 28 colunas x 20 linhas.
+========================================================= */
+
+const MAP = [
+"############################",
+"#............##............#",
+"#.####.#####.##.#####.####.#",
+"#o####.#####.##.#####.####o#",
+"#..........................#",
+"#.####.##.########.##.####.#",
+"#......##....##....##......#",
+"######.#####.##.#####.######",
+"#............PP............#",
+"#.####.#####....#####.####.#",
+"#......#............#......#",
+"####.#.##.####.####.##.#.###",
+"#....#........##........#...#",
+"#.##.###.####.####.###.##..#",
+"#o##.....#....##....#.....o#",
+"####.###.#.########.#.###.##",
+"#............##............#",
+"#.####.#####.##.#####.####.#",
+"#..........................#",
+"############################"
 ];
 
+/* =========================================================
+ESTADO DO JOGO
+========================================================= */
 
-/* =====================================================
-   ESTADO
-===================================================== */
+let grid = [];
 
-let map = [];
-
-let orbs = [];
-
+let pellets = [];
 let powerUps = [];
-
 let portals = [];
-
 let particles = [];
-
 let enemies = [];
 
-let gameRunning = true;
-
+let gameOver = false;
 let level = 1;
 
-let totalOrbs = 0;
+let remainingItems = 0;
 
-let remainingOrbs = 0;
+let frame = 0;
 
-let gameTime = 0;
+let audioContext = null;
 
-
-/* =====================================================
-   TECLAS
-===================================================== */
+/* =========================================================
+TECLADO
+========================================================= */
 
 const keys = {};
 
-window.addEventListener("keydown", event => {
+window.addEventListener("keydown", function (event) {
 
-    keys[event.code] = true;
+keys[event.code] = true;
 
-    if (
-        [
-            "ArrowUp",
-            "ArrowDown",
-            "ArrowLeft",
-            "ArrowRight",
-            "Space"
-        ].includes(event.code)
-    ) {
+const prevent = [
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "Space"
+];
 
-        event.preventDefault();
-
-    }
+if (prevent.includes(event.code)) {
+    event.preventDefault();
+}
 
 });
 
-window.addEventListener("keyup", event => {
+window.addEventListener("keyup", function (event) {
 
-    keys[event.code] = false;
+keys[event.code] = false;
 
 });
 
-
-/* =====================================================
-   UTILITÁRIOS
-===================================================== */
+/* =========================================================
+UTILITÁRIOS
+========================================================= */
 
 function clamp(value, min, max) {
 
-    return Math.max(
-        min,
-        Math.min(max, value)
-    );
-
-}
-
-function random(min, max) {
-
-    return Math.random() *
-        (max - min) +
-        min;
+return Math.max(min, Math.min(max, value));
 
 }
 
 function distance(a, b) {
 
-    return Math.hypot(
-        a.x - b.x,
-        a.y - b.y
-    );
+return Math.hypot(
+    a.x - b.x,
+    a.y - b.y
+);
 
 }
 
-function cellCenter(col, row) {
+function cellToPixel(col, row) {
 
-    return {
-
-        x: col * TILE + TILE / 2,
-
-        y: row * TILE + TILE / 2
-
-    };
+return {
+    x: col * TILE + TILE / 2,
+    y: row * TILE + TILE / 2
+};
 
 }
-
-
-/* =====================================================
-   CONSTRUIR MAPA
-===================================================== */
-
-function buildMap() {
-
-    map = [];
-
-    orbs = [];
-
-    powerUps = [];
-
-    portals = [];
-
-    for (let row = 0; row < ROWS; row++) {
-
-        const line =
-            mapTemplate[row]
-                .padEnd(COLS, "#");
-
-        map[row] = [];
-
-        for (
-            let col = 0;
-            col < COLS;
-            col++
-        ) {
-
-            const char =
-                line[col];
-
-            map[row][col] =
-                char === "#"
-                    ? "#"
-                    : " ";
-
-            const position =
-                cellCenter(col, row);
-
-
-            if (char === ".") {
-
-                orbs.push({
-
-                    x: position.x,
-
-                    y: position.y,
-
-                    radius: 4,
-
-                    collected: false,
-
-                    pulse: random(0, 6)
-
-                });
-
-            }
-
-
-            if (char === "o") {
-
-                powerUps.push({
-
-                    x: position.x,
-
-                    y: position.y,
-
-                    radius: 10,
-
-                    collected: false,
-
-                    pulse: random(0, 6)
-
-                });
-
-            }
-
-
-            if (char === "P") {
-
-                portals.push({
-
-                    x: position.x,
-
-                    y: position.y
-
-                });
-
-            }
-
-        }
-
-    }
-
-    totalOrbs =
-        orbs.length +
-        powerUps.length;
-
-    remainingOrbs =
-        totalOrbs;
-
-}
-
-
-/* =====================================================
-   VERIFICAR PAREDE
-===================================================== */
 
 function isWall(col, row) {
 
-    if (
-        row < 0 ||
-        row >= ROWS ||
-        col < 0 ||
-        col >= COLS
-    ) {
+if (
+    row < 0 ||
+    row >= ROWS ||
+    col < 0 ||
+    col >= COLS
+) {
+    return true;
+}
 
-        return true;
-
-    }
-
-    return map[row][col] === "#";
+return grid[row][col] === "#";
 
 }
 
+/* =========================================================
+CONSTRUIR MAPA
+========================================================= */
 
-/* =====================================================
-   COLISÃO COM MAPA
-===================================================== */
+function buildMap() {
+
+grid = [];
+pellets = [];
+powerUps = [];
+portals = [];
+
+for (let row = 0; row < ROWS; row++) {
+
+    const source = MAP[row];
+
+    grid[row] = [];
+
+    for (let col = 0; col < COLS; col++) {
+
+        const char = source[col];
+
+        if (char === "#") {
+
+            grid[row][col] = "#";
+
+        } else {
+
+            grid[row][col] = " ";
+
+        }
+
+        const position = cellToPixel(col, row);
+
+        if (char === ".") {
+
+            pellets.push({
+                x: position.x,
+                y: position.y,
+                collected: false,
+                phase: Math.random() * 10
+            });
+
+        }
+
+        if (char === "o") {
+
+            powerUps.push({
+                x: position.x,
+                y: position.y,
+                collected: false,
+                phase: Math.random() * 10
+            });
+
+        }
+
+        if (char === "P") {
+
+            portals.push({
+                x: position.x,
+                y: position.y
+            });
+
+        }
+
+    }
+
+}
+
+remainingItems =
+    pellets.length +
+    powerUps.length;
+
+}
+
+/* =========================================================
+COLISÃO COM PAREDES
+========================================================= */
 
 function canMove(x, y, radius) {
 
-    const points = [
+const points = [
+    { x: x - radius, y: y - radius },
+    { x: x + radius, y: y - radius },
+    { x: x - radius, y: y + radius },
+    { x: x + radius, y: y + radius }
+];
 
-        {
-            x: x - radius,
-            y: y - radius
-        },
+for (const point of points) {
 
-        {
-            x: x + radius,
-            y: y - radius
-        },
+    const col = Math.floor(point.x / TILE);
+    const row = Math.floor(point.y / TILE);
 
-        {
-            x: x - radius,
-            y: y + radius
-        },
-
-        {
-            x: x + radius,
-            y: y + radius
-        }
-
-    ];
-
-    for (const point of points) {
-
-        const col =
-            Math.floor(
-                point.x / TILE
-            );
-
-        const row =
-            Math.floor(
-                point.y / TILE
-            );
-
-        if (
-            isWall(col, row)
-        ) {
-
-            return false;
-
-        }
-
+    if (isWall(col, row)) {
+        return false;
     }
-
-    return true;
 
 }
 
+return true;
 
-/* =====================================================
-   PARTÍCULAS
-===================================================== */
+}
 
-function spawnParticles(
-    x,
-    y,
-    color,
-    amount = 12
+/* =========================================================
+DIREÇÕES
+========================================================= */
+
+const DIRECTIONS = [
+{ x: 1, y: 0 },
+{ x: -1, y: 0 },
+{ x: 0, y: 1 },
+{ x: 0, y: -1 }
+];
+
+function canDirectionMove(entity, direction) {
+
+const testX =
+    entity.x +
+    direction.x *
+    entity.speed *
+    2;
+
+const testY =
+    entity.y +
+    direction.y *
+    entity.speed *
+    2;
+
+return canMove(
+    testX,
+    testY,
+    entity.radius
+);
+
+}
+
+/* =========================================================
+PARTÍCULAS
+========================================================= */
+
+function createParticles(
+x,
+y,
+color,
+amount = 12
 ) {
 
-    for (
-        let i = 0;
-        i < amount;
-        i++
-    ) {
+for (let i = 0; i < amount; i++) {
 
-        particles.push({
+    particles.push({
 
-            x,
+        x,
+        y,
 
-            y,
+        vx:
+            (Math.random() - .5) * 5,
 
-            vx: random(-3, 3),
+        vy:
+            (Math.random() - .5) * 5,
 
-            vy: random(-3, 3),
+        size:
+            2 + Math.random() * 4,
 
-            size: random(2, 5),
+        life:
+            20 + Math.random() * 25,
 
-            life: random(20, 45),
+        color
 
-            color
+    });
 
-        });
-
-    }
+}
 
 }
 
 function updateParticles() {
 
-    particles.forEach(p => {
+for (const particle of particles) {
 
-        p.x += p.vx;
+    particle.x += particle.vx;
+    particle.y += particle.vy;
 
-        p.y += p.vy;
+    particle.vx *= .96;
+    particle.vy *= .96;
 
-        p.vx *= .97;
+    particle.life--;
 
-        p.vy *= .97;
+}
 
-        p.life--;
-
-    });
-
-    particles =
-        particles.filter(
-            p => p.life > 0
-        );
+particles =
+    particles.filter(
+        particle =>
+            particle.life > 0
+    );
 
 }
 
 function drawParticles() {
 
-    particles.forEach(p => {
+for (const particle of particles) {
 
-        ctx.globalAlpha =
-            p.life / 45;
+    ctx.globalAlpha =
+        particle.life / 45;
 
-        ctx.fillStyle =
-            p.color;
+    ctx.fillStyle =
+        particle.color;
 
-        ctx.fillRect(
-            p.x,
-            p.y,
-            p.size,
-            p.size
-        );
-
-    });
-
-    ctx.globalAlpha = 1;
+    ctx.fillRect(
+        particle.x,
+        particle.y,
+        particle.size,
+        particle.size
+    );
 
 }
 
+ctx.globalAlpha = 1;
 
-/* =====================================================
-   PLAYER
-===================================================== */
+}
+
+/* =========================================================
+PLAYER
+========================================================= */
 
 class Player {
 
-    constructor(options) {
+constructor({
+    name,
+    color,
+    x,
+    y
+}) {
 
-        this.name =
-            options.name;
+    this.name = name;
 
-        this.color =
-            options.color;
+    this.color = color;
 
-        this.x =
-            options.x;
+    this.x = x;
+    this.y = y;
 
-        this.y =
-            options.y;
+    this.spawnX = x;
+    this.spawnY = y;
 
-        this.spawnX =
-            options.x;
+    this.radius = 11;
 
-        this.spawnY =
-            options.y;
+    this.speed = 2.65;
 
-        this.radius = 11;
+    this.dirX = 0;
+    this.dirY = 0;
 
-        this.speed = 2.8;
+    this.nextX = 0;
+    this.nextY = 0;
 
-        this.dirX = 0;
+    this.score = 0;
 
-        this.dirY = 0;
+    this.lives = 3;
+
+    this.powerTimer = 0;
+
+    this.invincibleTimer = 0;
+
+    this.portalCooldown = 0;
+
+    this.alive = true;
+
+}
+
+resetPosition() {
+
+    this.x = this.spawnX;
+    this.y = this.spawnY;
+
+    this.dirX = 0;
+    this.dirY = 0;
+
+    this.nextX = 0;
+    this.nextY = 0;
+
+    this.invincibleTimer = 90;
+    this.portalCooldown = 30;
+
+}
+
+update(controls) {
+
+    if (!this.alive) {
+        return;
+    }
+
+    /* =========================
+       INPUT
+    ========================= */
+
+    if (keys[controls.up]) {
 
         this.nextX = 0;
-
-        this.nextY = 0;
-
-        this.score = 0;
-
-        this.lives = 3;
-
-        this.powerTimer = 0;
-
-        this.invincible = 0;
-
-        this.alive = true;
+        this.nextY = -1;
 
     }
 
-
-    resetPosition() {
-
-        this.x =
-            this.spawnX;
-
-        this.y =
-            this.spawnY;
-
-        this.dirX = 0;
-
-        this.dirY = 0;
+    if (keys[controls.down]) {
 
         this.nextX = 0;
-
-        this.nextY = 0;
-
-        this.invincible = 90;
+        this.nextY = 1;
 
     }
 
+    if (keys[controls.left]) {
 
-    update(control) {
+        this.nextX = -1;
+        this.nextY = 0;
 
-        if (!this.alive) {
+    }
 
-            return;
+    if (keys[controls.right]) {
 
-        }
+        this.nextX = 1;
+        this.nextY = 0;
 
+    }
 
-        /* =========================
-           CONTROLES
-        ========================= */
+    /* =========================
+       TENTAR NOVA DIREÇÃO
+    ========================= */
 
-        if (keys[control.up]) {
-
-            this.nextX = 0;
-
-            this.nextY = -1;
-
-        }
-
-        if (keys[control.down]) {
-
-            this.nextX = 0;
-
-            this.nextY = 1;
-
-        }
-
-        if (keys[control.left]) {
-
-            this.nextX = -1;
-
-            this.nextY = 0;
-
-        }
-
-        if (keys[control.right]) {
-
-            this.nextX = 1;
-
-            this.nextY = 0;
-
-        }
-
-
-        /* =========================
-           NOVA DIREÇÃO
-        ========================= */
-
-        const nextX =
+    if (
+        canMove(
             this.x +
             this.nextX *
-            this.speed;
+            this.speed *
+            2,
 
-        const nextY =
             this.y +
             this.nextY *
-            this.speed;
+            this.speed *
+            2,
 
-        if (
-            canMove(
-                nextX,
-                nextY,
-                this.radius
-            )
-        ) {
+            this.radius
+        )
+    ) {
 
-            this.dirX =
-                this.nextX;
+        this.dirX = this.nextX;
+        this.dirY = this.nextY;
 
-            this.dirY =
-                this.nextY;
+    }
 
-        }
+    /* =========================
+       MOVIMENTO
+    ========================= */
 
-
-        /* =========================
-           MOVIMENTO
-        ========================= */
-
-        const moveX =
+    const nextPosition = {
+        x:
             this.x +
             this.dirX *
-            this.speed;
+            this.speed,
 
-        const moveY =
+        y:
             this.y +
             this.dirY *
-            this.speed;
+            this.speed
+    };
 
-        if (
-            canMove(
-                moveX,
-                moveY,
-                this.radius
-            )
-        ) {
+    if (
+        canMove(
+            nextPosition.x,
+            nextPosition.y,
+            this.radius
+        )
+    ) {
 
-            this.x = moveX;
-
-            this.y = moveY;
-
-        }
-
-
-        /* =========================
-           POWER-UP
-        ========================= */
-
-        if (
-            this.powerTimer > 0
-        ) {
-
-            this.powerTimer--;
-
-        }
-
-        if (
-            this.invincible > 0
-        ) {
-
-            this.invincible--;
-
-        }
-
-
-        collectItems(this);
-
-        usePortal(this);
+        this.x = nextPosition.x;
+        this.y = nextPosition.y;
 
     }
 
+    /* =========================
+       TIMERS
+    ========================= */
 
-    collectItems(player) {
-
-        /* ORBS */
-
-        orbs.forEach(orb => {
-
-            if (
-                orb.collected
-            ) {
-
-                return;
-
-            }
-
-            if (
-                Math.hypot(
-                    player.x - orb.x,
-                    player.y - orb.y
-                ) < 15
-            ) {
-
-                orb.collected = true;
-
-                player.score += 10;
-
-                remainingOrbs--;
-
-                spawnParticles(
-                    orb.x,
-                    orb.y,
-                    "#ffd43b",
-                    7
-                );
-
-                playSound(
-                    600,
-                    .04,
-                    "square"
-                );
-
-            }
-
-        });
-
-
-        /* POWER */
-
-        powerUps.forEach(power => {
-
-            if (
-                power.collected
-            ) {
-
-                return;
-
-            }
-
-            if (
-                Math.hypot(
-                    player.x - power.x,
-                    player.y - power.y
-                ) < 18
-            ) {
-
-                power.collected = true;
-
-                player.score += 50;
-
-                player.powerTimer =
-                    60 * 8;
-
-                remainingOrbs--;
-
-                spawnParticles(
-                    power.x,
-                    power.y,
-                    "#29e7ff",
-                    25
-                );
-
-                playSound(
-                    900,
-                    .1,
-                    "sine"
-                );
-
-            }
-
-        });
-
+    if (this.powerTimer > 0) {
+        this.powerTimer--;
     }
 
+    if (this.invincibleTimer > 0) {
+        this.invincibleTimer--;
+    }
 
-    draw() {
+    if (this.portalCooldown > 0) {
+        this.portalCooldown--;
+    }
 
-        if (!this.alive) {
+    collectItems(this);
 
-            return;
+    checkPortal(this);
 
-        }
+}
 
-        ctx.save();
+draw() {
 
-        /* POWER EFFECT */
+    if (!this.alive) {
+        return;
+    }
 
-        if (
-            this.powerTimer > 0
-        ) {
+    ctx.save();
 
-            ctx.shadowColor =
-                "#29e7ff";
+    /* POWER-UP */
 
-            ctx.shadowBlur = 20;
+    if (this.powerTimer > 0) {
 
-            ctx.strokeStyle =
-                "#29e7ff";
+        ctx.shadowColor = "#24e6ff";
+        ctx.shadowBlur = 18;
 
-            ctx.lineWidth = 3;
-
-            ctx.beginPath();
-
-            ctx.arc(
-                this.x,
-                this.y,
-                17 +
-                    Math.sin(
-                        gameTime * .2
-                    ) * 2,
-                0,
-                Math.PI * 2
-            );
-
-            ctx.stroke();
-
-        }
-
-
-        /* INVENCIBILIDADE */
-
-        if (
-            this.invincible > 0 &&
-            Math.floor(
-                this.invincible / 5
-            ) % 2 === 0
-        ) {
-
-            ctx.globalAlpha = .45;
-
-        }
-
-
-        /* CABEÇA */
-
-        ctx.fillStyle =
-            this.color;
-
-        ctx.shadowColor =
-            this.color;
-
-        ctx.shadowBlur = 12;
+        ctx.strokeStyle = "#24e6ff";
+        ctx.lineWidth = 3;
 
         ctx.beginPath();
 
         ctx.arc(
             this.x,
             this.y,
-            this.radius,
+            17 +
+            Math.sin(frame * .15) * 2,
             0,
             Math.PI * 2
         );
 
-        ctx.fill();
+        ctx.stroke();
 
+    }
 
-        /* OLHO */
+    /* INVENCIBILIDADE */
 
-        ctx.shadowBlur = 0;
+    if (
+        this.invincibleTimer > 0 &&
+        Math.floor(
+            this.invincibleTimer / 5
+        ) % 2 === 0
+    ) {
 
-        ctx.fillStyle =
-            "#ffffff";
+        ctx.globalAlpha = .4;
 
-        ctx.beginPath();
+    }
 
-        ctx.arc(
-            this.x +
-                this.dirX * 5,
-            this.y +
-                this.dirY * 5,
-            3,
-            0,
-            Math.PI * 2
+    ctx.fillStyle = this.color;
+
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 13;
+
+    ctx.beginPath();
+
+    ctx.arc(
+        this.x,
+        this.y,
+        this.radius,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+    /* OLHO */
+
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "#ffffff";
+
+    const eyeX =
+        this.x +
+        this.dirX * 5;
+
+    const eyeY =
+        this.y +
+        this.dirY * 5;
+
+    ctx.beginPath();
+
+    ctx.arc(
+        eyeX,
+        eyeY,
+        3,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.restore();
+
+}
+
+}
+
+/* =========================================================
+CRIAR JOGADORES
+========================================================= */
+
+const player1 = new Player({
+
+name: "PLAYER 1",
+
+color: "#ff3864",
+
+x: TILE * 1.5,
+
+y: TILE * 4.5
+
+});
+
+const player2 = new Player({
+
+name: "PLAYER 2",
+
+color: "#378bff",
+
+x: TILE * 26.5,
+
+y: TILE * 4.5
+
+});
+
+/* =========================================================
+PEGAR ITENS
+========================================================= */
+
+function collectItems(player) {
+
+for (const pellet of pellets) {
+
+    if (pellet.collected) {
+        continue;
+    }
+
+    if (
+        distance(
+            player,
+            pellet
+        ) < 15
+    ) {
+
+        pellet.collected = true;
+
+        player.score += 10;
+
+        remainingItems--;
+
+        createParticles(
+            pellet.x,
+            pellet.y,
+            "#ffd447",
+            6
         );
 
-        ctx.fill();
-
-        ctx.restore();
+        playTone(
+            600,
+            .035,
+            "square"
+        );
 
     }
 
 }
 
+for (const power of powerUps) {
 
-/* =====================================================
-   INIMIGO
-===================================================== */
+    if (power.collected) {
+        continue;
+    }
+
+    if (
+        distance(
+            player,
+            power
+        ) < 18
+    ) {
+
+        power.collected = true;
+
+        player.score += 50;
+
+        player.powerTimer =
+            60 * 7;
+
+        remainingItems--;
+
+        createParticles(
+            power.x,
+            power.y,
+            "#24e6ff",
+            22
+        );
+
+        playTone(
+            900,
+            .1,
+            "sine"
+        );
+
+    }
+
+}
+
+}
+
+/* =========================================================
+PORTAIS
+========================================================= */
+
+function checkPortal(player) {
+
+if (
+    player.portalCooldown > 0 ||
+    portals.length < 2
+) {
+    return;
+}
+
+for (let i = 0; i < portals.length; i++) {
+
+    const portal = portals[i];
+
+    if (
+        distance(
+            player,
+            portal
+        ) < 13
+    ) {
+
+        const other =
+            portals[
+                i === 0 ? 1 : 0
+            ];
+
+        player.x = other.x;
+        player.y = other.y;
+
+        player.portalCooldown = 40;
+
+        player.score += 5;
+
+        createParticles(
+            other.x,
+            other.y,
+            "#b45cff",
+            20
+        );
+
+        playTone(
+            450,
+            .08,
+            "triangle"
+        );
+
+        break;
+
+    }
+
+}
+
+}
+
+/* =========================================================
+INIMIGO
+========================================================= */
 
 class Enemy {
 
-    constructor(options) {
+constructor({
+    x,
+    y,
+    color,
+    mode,
+    speed
+}) {
 
-        this.x =
-            options.x;
+    this.x = x;
+    this.y = y;
 
-        this.y =
-            options.y;
+    this.spawnX = x;
+    this.spawnY = y;
 
-        this.color =
-            options.color;
+    this.color = color;
 
-        this.type =
-            options.type;
+    this.mode = mode;
 
-        this.radius = 12;
+    this.radius = 11;
 
-        this.speed =
-            options.speed || 1.7;
+    this.speed = speed;
 
-        this.dirX = 0;
+    this.dirX = 0;
+    this.dirY = 0;
 
-        this.dirY = 0;
+    this.changeTimer = 0;
 
-        this.changeTimer = 0;
+}
+
+update() {
+
+    const targets = [
+        player1,
+        player2
+    ].filter(
+        player =>
+            player.alive
+    );
+
+    if (targets.length === 0) {
+        return;
+    }
+
+    let target = targets[0];
+
+    if (
+        targets.length > 1 &&
+        distance(
+            this,
+            targets[1]
+        ) <
+        distance(
+            this,
+            targets[0]
+        )
+    ) {
+
+        target = targets[1];
 
     }
 
+    if (this.mode === "random") {
 
-    update() {
+        this.randomBehavior();
 
-        const targets = [
-            player1,
-            player2
-        ].filter(
-            p => p.alive
+    } else if (
+        this.mode === "ambush"
+    ) {
+
+        this.chase({
+            x:
+                target.x +
+                target.dirX *
+                TILE *
+                3,
+
+            y:
+                target.y +
+                target.dirY *
+                TILE *
+                3
+        });
+
+    } else {
+
+        this.chase(target);
+
+    }
+
+    const nextX =
+        this.x +
+        this.dirX *
+        this.speed;
+
+    const nextY =
+        this.y +
+        this.dirY *
+        this.speed;
+
+    if (
+        canMove(
+            nextX,
+            nextY,
+            this.radius
+        )
+    ) {
+
+        this.x = nextX;
+        this.y = nextY;
+
+    } else {
+
+        this.chooseDirection();
+
+    }
+
+    this.collideWithPlayers();
+
+}
+
+chase(target) {
+
+    const dx =
+        target.x - this.x;
+
+    const dy =
+        target.y - this.y;
+
+    let primary;
+    let secondary;
+
+    if (
+        Math.abs(dx) >
+        Math.abs(dy)
+    ) {
+
+        primary = {
+            x: Math.sign(dx),
+            y: 0
+        };
+
+        secondary = {
+            x: 0,
+            y: Math.sign(dy)
+        };
+
+    } else {
+
+        primary = {
+            x: 0,
+            y: Math.sign(dy)
+        };
+
+        secondary = {
+            x: Math.sign(dx),
+            y: 0
+        };
+
+    }
+
+    if (
+        canDirectionMove(
+            this,
+            primary
+        )
+    ) {
+
+        this.dirX = primary.x;
+        this.dirY = primary.y;
+
+    } else if (
+        canDirectionMove(
+            this,
+            secondary
+        )
+    ) {
+
+        this.dirX = secondary.x;
+        this.dirY = secondary.y;
+
+    } else {
+
+        this.chooseDirection();
+
+    }
+
+}
+
+randomBehavior() {
+
+    this.changeTimer--;
+
+    if (
+        this.changeTimer <= 0 ||
+        !canDirectionMove(
+            this,
+            {
+                x: this.dirX,
+                y: this.dirY
+            }
+        )
+    ) {
+
+        this.chooseDirection();
+
+    }
+
+}
+
+chooseDirection() {
+
+    const available =
+        DIRECTIONS.filter(
+            direction =>
+                canDirectionMove(
+                    this,
+                    direction
+                )
         );
 
-
-        if (
-            targets.length === 0
-        ) {
-
-            return;
-
-        }
-
-
-        let target =
-            targets[0];
-
-        if (
-            distance(
-                this,
-                targets[1]
-            ) <
-            distance(
-                this,
-                targets[0]
-            )
-        ) {
-
-            target =
-                targets[1];
-
-        }
-
-
-        /* INIMIGO VERMELHO */
-
-        if (
-            this.type === "hunter"
-        ) {
-
-            this.chase(
-                target
-            );
-
-        }
-
-
-        /* INIMIGO ROXO */
-
-        else if (
-            this.type === "ambush"
-        ) {
-
-            const predicted = {
-
-                x:
-                    target.x +
-                    target.dirX *
-                    TILE *
-                    3,
-
-                y:
-                    target.y +
-                    target.dirY *
-                    TILE *
-                    3
-
-            };
-
-            this.chase(
-                predicted
-            );
-
-        }
-
-
-        /* INIMIGO VERDE */
-
-        else {
-
-            this.randomMove();
-
-        }
-
-
-        const newX =
-            this.x +
-            this.dirX *
-            this.speed;
-
-        const newY =
-            this.y +
-            this.dirY *
-            this.speed;
-
-
-        if (
-            canMove(
-                newX,
-                newY,
-                this.radius
-            )
-        ) {
-
-            this.x = newX;
-
-            this.y = newY;
-
-        } else {
-
-            this.changeDirection();
-
-        }
-
-
-        this.checkPlayerCollision();
-
+    if (available.length === 0) {
+        return;
     }
 
+    const direction =
+        available[
+            Math.floor(
+                Math.random() *
+                available.length
+            )
+        ];
 
-    chase(target) {
+    this.dirX = direction.x;
+    this.dirY = direction.y;
 
-        const dx =
-            target.x -
-            this.x;
+    this.changeTimer =
+        35 +
+        Math.floor(
+            Math.random() * 65
+        );
 
-        const dy =
-            target.y -
-            this.y;
+}
 
+collideWithPlayers() {
 
-        if (
-            Math.abs(dx) >
-            Math.abs(dy)
-        ) {
+    const players = [
+        player1,
+        player2
+    ];
 
-            this.dirX =
-                Math.sign(dx);
+    for (const player of players) {
 
-            this.dirY = 0;
-
-        } else {
-
-            this.dirX = 0;
-
-            this.dirY =
-                Math.sign(dy);
-
+        if (!player.alive) {
+            continue;
         }
 
-
-        /* TENTAR MOVIMENTO ALTERNATIVO */
-
         if (
-            !canMove(
-                this.x +
-                    this.dirX *
-                    this.speed,
-                this.y +
-                    this.dirY *
-                    this.speed,
-                this.radius
-            )
+            distance(
+                this,
+                player
+            ) <
+            this.radius +
+            player.radius
         ) {
 
             if (
-                Math.abs(dx) >
-                Math.abs(dy)
+                player.powerTimer > 0
             ) {
 
-                this.dirX = 0;
+                player.score += 100;
 
-                this.dirY =
-                    Math.sign(dy);
+                createParticles(
+                    this.x,
+                    this.y,
+                    this.color,
+                    25
+                );
+
+                playTone(
+                    220,
+                    .1,
+                    "sawtooth"
+                );
+
+                this.respawn();
 
             } else {
 
-                this.dirX =
-                    Math.sign(dx);
-
-                this.dirY = 0;
+                hurtPlayer(player);
 
             }
 
@@ -1108,1238 +1128,880 @@ class Enemy {
 
     }
 
+}
 
-    randomMove() {
+respawn() {
 
-        this.changeTimer--;
+    const openCells = [];
 
-        if (
-            this.changeTimer <= 0
-        ) {
-
-            this.changeDirection();
-
-        }
-
-    }
-
-
-    changeDirection() {
-
-        const directions = [
-
-            {
-                x: 1,
-                y: 0
-            },
-
-            {
-                x: -1,
-                y: 0
-            },
-
-            {
-                x: 0,
-                y: 1
-            },
-
-            {
-                x: 0,
-                y: -1
-            }
-
-        ];
-
-        const possible =
-            directions.filter(
-                direction =>
-                    canMove(
-                        this.x +
-                            direction.x *
-                            TILE / 2,
-                        this.y +
-                            direction.y *
-                            TILE / 2,
-                        this.radius
-                    )
-            );
-
-
-        if (
-            possible.length
-        ) {
-
-            const direction =
-                possible[
-                    Math.floor(
-                        Math.random() *
-                        possible.length
-                    )
-                ];
-
-            this.dirX =
-                direction.x;
-
-            this.dirY =
-                direction.y;
-
-        }
-
-        this.changeTimer =
-            Math.floor(
-                random(30, 90)
-            );
-
-    }
-
-
-    checkPlayerCollision() {
-
-        const players = [
-            player1,
-            player2
-        ];
-
-        players.forEach(player => {
-
-            if (
-                !player.alive
-            ) {
-
-                return;
-
-            }
-
-            const d =
-                distance(
-                    this,
-                    player
-                );
-
-
-            if (
-                d <
-                this.radius +
-                player.radius
-            ) {
-
-                if (
-                    player.powerTimer >
-                    0
-                ) {
-
-                    player.score += 100;
-
-                    spawnParticles(
-                        this.x,
-                        this.y,
-                        this.color,
-                        25
-                    );
-
-                    playSound(
-                        250,
-                        .12,
-                        "sawtooth"
-                    );
-
-                    this.respawn();
-
-                } else {
-
-                    damagePlayer(
-                        player
-                    );
-
-                }
-
-            }
-
-        });
-
-    }
-
-
-    respawn() {
-
-        const freeCells = [];
+    for (
+        let row = 1;
+        row < ROWS - 1;
+        row++
+    ) {
 
         for (
-            let row = 1;
-            row < ROWS - 1;
-            row++
+            let col = 1;
+            col < COLS - 1;
+            col++
         ) {
 
-            for (
-                let col = 1;
-                col < COLS - 1;
-                col++
+            if (
+                !isWall(col, row)
             ) {
 
-                if (
-                    !isWall(
+                openCells.push(
+                    cellToPixel(
                         col,
                         row
                     )
-                ) {
-
-                    freeCells.push(
-                        cellCenter(
-                            col,
-                            row
-                        )
-                    );
-
-                }
+                );
 
             }
 
         }
 
-        const position =
-            freeCells[
-                Math.floor(
-                    Math.random() *
-                    freeCells.length
-                )
-            ];
-
-        this.x =
-            position.x;
-
-        this.y =
-            position.y;
-
     }
 
-
-    draw() {
-
-        ctx.save();
-
-        ctx.shadowColor =
-            this.color;
-
-        ctx.shadowBlur = 15;
-
-        ctx.fillStyle =
-            this.color;
-
-
-        /* CABEÇA */
-
-        ctx.beginPath();
-
-        ctx.arc(
-            this.x,
-            this.y,
-            this.radius,
-            Math.PI,
-            0
-        );
-
-        ctx.lineTo(
-            this.x +
-                this.radius,
-            this.y +
-                this.radius
-        );
-
-        ctx.lineTo(
-            this.x +
-                5,
-            this.y +
-                7
-        );
-
-        ctx.lineTo(
-            this.x,
-            this.y +
-                this.radius
-        );
-
-        ctx.lineTo(
-            this.x -
-                5,
-            this.y +
-                7
-        );
-
-        ctx.lineTo(
-            this.x -
-                this.radius,
-            this.y +
-                this.radius
-        );
-
-        ctx.closePath();
-
-        ctx.fill();
-
-
-        /* OLHOS */
-
-        ctx.shadowBlur = 0;
-
-        ctx.fillStyle =
-            "#ffffff";
-
-        ctx.beginPath();
-
-        ctx.arc(
-            this.x - 4,
-            this.y - 2,
-            3,
-            0,
-            Math.PI * 2
-        );
-
-        ctx.arc(
-            this.x + 4,
-            this.y - 2,
-            3,
-            0,
-            Math.PI * 2
-        );
-
-        ctx.fill();
-
-
-        ctx.fillStyle =
-            "#111";
-
-        ctx.beginPath();
-
-        ctx.arc(
-            this.x - 4 +
-                this.dirX * 2,
-            this.y - 2 +
-                this.dirY * 2,
-            1.5,
-            0,
-            Math.PI * 2
-        );
-
-        ctx.arc(
-            this.x + 4 +
-                this.dirX * 2,
-            this.y - 2 +
-                this.dirY * 2,
-            1.5,
-            0,
-            Math.PI * 2
-        );
-
-        ctx.fill();
-
-        ctx.restore();
-
+    if (openCells.length === 0) {
+        return;
     }
+
+    const position =
+        openCells[
+            Math.floor(
+                Math.random() *
+                openCells.length
+            )
+        ];
+
+    this.x = position.x;
+    this.y = position.y;
+
+    this.chooseDirection();
 
 }
 
+draw() {
 
-/* =====================================================
-   CRIAR PLAYERS
-===================================================== */
+    ctx.save();
 
-const player1 =
-    new Player({
+    ctx.fillStyle = this.color;
 
-        name: "PLAYER 1",
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 13;
 
-        color: "#ff3b5f",
+    /* CORPO */
 
-        x: TILE * 2.5,
+    ctx.beginPath();
 
-        y: TILE * 4.5
+    ctx.arc(
+        this.x,
+        this.y,
+        this.radius,
+        Math.PI,
+        0
+    );
 
-    });
+    ctx.lineTo(
+        this.x + this.radius,
+        this.y + this.radius
+    );
 
+    ctx.lineTo(
+        this.x + 5,
+        this.y + 7
+    );
 
-const player2 =
-    new Player({
+    ctx.lineTo(
+        this.x,
+        this.y + this.radius
+    );
 
-        name: "PLAYER 2",
+    ctx.lineTo(
+        this.x - 5,
+        this.y + 7
+    );
 
-        color: "#3b8cff",
+    ctx.lineTo(
+        this.x - this.radius,
+        this.y + this.radius
+    );
 
-        x: TILE * 27.5,
+    ctx.closePath();
 
-        y: TILE * 4.5
+    ctx.fill();
 
-    });
+    /* OLHOS */
 
+    ctx.shadowBlur = 0;
 
-/* =====================================================
-   INIMIGOS
-===================================================== */
+    ctx.fillStyle = "#ffffff";
+
+    ctx.beginPath();
+
+    ctx.arc(
+        this.x - 4,
+        this.y - 2,
+        3,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.arc(
+        this.x + 4,
+        this.y - 2,
+        3,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.fillStyle = "#111827";
+
+    ctx.beginPath();
+
+    ctx.arc(
+        this.x - 4 +
+        this.dirX * 2,
+
+        this.y - 2 +
+        this.dirY * 2,
+
+        1.5,
+
+        0,
+        Math.PI * 2
+    );
+
+    ctx.arc(
+        this.x + 4 +
+        this.dirX * 2,
+
+        this.y - 2 +
+        this.dirY * 2,
+
+        1.5,
+
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.restore();
+
+}
+
+}
+
+/* =========================================================
+CRIAR INIMIGOS
+========================================================= */
 
 function createEnemies() {
 
-    enemies = [
+enemies = [
 
-        new Enemy({
+    new Enemy({
+        x: TILE * 13.5,
+        y: TILE * 8.5,
+        color: "#ff416c",
+        mode: "chase",
+        speed: 1.45
+    }),
 
-            x: TILE * 14.5,
+    new Enemy({
+        x: TILE * 14.5,
+        y: TILE * 8.5,
+        color: "#b45cff",
+        mode: "ambush",
+        speed: 1.35
+    }),
 
-            y: TILE * 8.5,
+    new Enemy({
+        x: TILE * 13.5,
+        y: TILE * 10.5,
+        color: "#35e875",
+        mode: "random",
+        speed: 1.25
+    }),
 
-            color: "#ff416c",
+    new Enemy({
+        x: TILE * 14.5,
+        y: TILE * 10.5,
+        color: "#ff9d1c",
+        mode: "chase",
+        speed: 1.15
+    })
 
-            type: "hunter",
+];
 
-            speed: 1.65
-
-        }),
-
-        new Enemy({
-
-            x: TILE * 15.5,
-
-            y: TILE * 8.5,
-
-            color: "#b34dff",
-
-            type: "ambush",
-
-            speed: 1.55
-
-        }),
-
-        new Enemy({
-
-            x: TILE * 14.5,
-
-            y: TILE * 10.5,
-
-            color: "#39e66d",
-
-            type: "random",
-
-            speed: 1.45
-
-        }),
-
-        new Enemy({
-
-            x: TILE * 15.5,
-
-            y: TILE * 10.5,
-
-            color: "#ff9f1c",
-
-            type: "hunter",
-
-            speed: 1.35
-
-        })
-
-    ];
+enemies.forEach(enemy => {
+    enemy.chooseDirection();
+});
 
 }
 
+/* =========================================================
+DANO AO JOGADOR
+========================================================= */
 
-/* =====================================================
-   DANO AO PLAYER
-===================================================== */
+function hurtPlayer(player) {
 
-function damagePlayer(player) {
+if (
+    player.invincibleTimer > 0
+) {
+    return;
+}
 
-    if (
-        player.invincible > 0
-    ) {
+player.lives--;
 
-        return;
+createParticles(
+    player.x,
+    player.y,
+    player.color,
+    25
+);
 
-    }
+playTone(
+    120,
+    .15,
+    "sawtooth"
+);
 
-    player.lives--;
+if (player.lives <= 0) {
 
-    spawnParticles(
-        player.x,
-        player.y,
-        player.color,
-        25
-    );
+    player.alive = false;
 
-    playSound(
-        100,
-        .2,
-        "sawtooth"
-    );
+    checkGameOver();
 
-
-    if (
-        player.lives <= 0
-    ) {
-
-        player.alive = false;
-
-        checkGameOver();
-
-        return;
-
-    }
-
+} else {
 
     player.resetPosition();
 
 }
 
-
-/* =====================================================
-   PORTAIS
-===================================================== */
-
-function usePortal(player) {
-
-    if (
-        portals.length < 2
-    ) {
-
-        return;
-
-    }
-
-
-    portals.forEach((portal, index) => {
-
-        const d =
-            Math.hypot(
-                player.x - portal.x,
-                player.y - portal.y
-            );
-
-        if (
-            d < 15
-        ) {
-
-            const destination =
-                portals[
-                    index === 0
-                        ? 1
-                        : 0
-                ];
-
-            if (
-                Math.hypot(
-                    player.x -
-                        destination.x,
-                    player.y -
-                        destination.y
-                ) < 10
-            ) {
-
-                return;
-
-            }
-
-            player.x =
-                destination.x;
-
-            player.y =
-                destination.y;
-
-            player.score += 5;
-
-            spawnParticles(
-                player.x,
-                player.y,
-                "#a855ff",
-                20
-            );
-
-        }
-
-    });
-
 }
 
-
-/* =====================================================
-   DESENHAR FUNDO
-===================================================== */
+/* =========================================================
+DESENHAR FUNDO
+========================================================= */
 
 function drawBackground() {
 
-    const gradient =
-        ctx.createLinearGradient(
-            0,
-            0,
-            0,
-            HEIGHT
-        );
-
-    gradient.addColorStop(
-        0,
-        "#050817"
-    );
-
-    gradient.addColorStop(
-        1,
-        "#02030a"
-    );
-
-    ctx.fillStyle =
-        gradient;
-
-    ctx.fillRect(
+const gradient =
+    ctx.createLinearGradient(
         0,
         0,
-        WIDTH,
+        0,
         HEIGHT
     );
 
+gradient.addColorStop(
+    0,
+    "#030718"
+);
+
+gradient.addColorStop(
+    .5,
+    "#060b1d"
+);
+
+gradient.addColorStop(
+    1,
+    "#02030a"
+);
+
+ctx.fillStyle = gradient;
+
+ctx.fillRect(
+    0,
+    0,
+    WIDTH,
+    HEIGHT
+);
+
 }
 
-
-/* =====================================================
-   DESENHAR MAPA
-===================================================== */
+/* =========================================================
+DESENHAR LABIRINTO
+========================================================= */
 
 function drawMap() {
 
+for (
+    let row = 0;
+    row < ROWS;
+    row++
+) {
+
     for (
-        let row = 0;
-        row < ROWS;
-        row++
+        let col = 0;
+        col < COLS;
+        col++
     ) {
 
-        for (
-            let col = 0;
-            col < COLS;
-            col++
+        if (
+            !isWall(col, row)
         ) {
-
-            if (
-                isWall(col, row)
-            ) {
-
-                const x =
-                    col * TILE;
-
-                const y =
-                    row * TILE;
-
-
-                /* PAREDE */
-
-                ctx.fillStyle =
-                    "#0d1735";
-
-                ctx.fillRect(
-                    x,
-                    y,
-                    TILE,
-                    TILE
-                );
-
-
-                /* BORDA */
-
-                ctx.strokeStyle =
-                    "#1d49a8";
-
-                ctx.lineWidth = 1;
-
-                ctx.strokeRect(
-                    x + 1,
-                    y + 1,
-                    TILE - 2,
-                    TILE - 2
-                );
-
-
-                /* DETALHE */
-
-                ctx.fillStyle =
-                    "rgba(60,130,255,.08)";
-
-                ctx.fillRect(
-                    x + 5,
-                    y + 5,
-                    TILE - 10,
-                    3
-                );
-
-            }
-
+            continue;
         }
+
+        const x = col * TILE;
+        const y = row * TILE;
+
+        /* PAREDE */
+
+        ctx.fillStyle = "#0a1532";
+
+        ctx.fillRect(
+            x,
+            y,
+            TILE,
+            TILE
+        );
+
+        /* BORDA */
+
+        ctx.strokeStyle =
+            "#1744a3";
+
+        ctx.lineWidth = 1;
+
+        ctx.strokeRect(
+            x + .5,
+            y + .5,
+            TILE - 1,
+            TILE - 1
+        );
+
+        /* BRILHO INTERNO */
+
+        ctx.fillStyle =
+            "rgba(52, 125, 255, .09)";
+
+        ctx.fillRect(
+            x + 4,
+            y + 4,
+            TILE - 8,
+            3
+        );
 
     }
 
-
-    /* PORTAIS */
-
-    portals.forEach(
-        (portal, index) => {
-
-            const pulse =
-                Math.sin(
-                    gameTime * .12 +
-                    index
-                ) * 3;
-
-
-            ctx.save();
-
-            ctx.shadowColor =
-                "#a855ff";
-
-            ctx.shadowBlur = 20;
-
-            ctx.strokeStyle =
-                "#a855ff";
-
-            ctx.lineWidth = 3;
-
-            ctx.beginPath();
-
-            ctx.arc(
-                portal.x,
-                portal.y,
-                10 + pulse,
-                0,
-                Math.PI * 2
-            );
-
-            ctx.stroke();
-
-            ctx.restore();
-
-        }
-    );
-
 }
 
+/* PORTAIS */
 
-/* =====================================================
-   DESENHAR ORBS
-===================================================== */
-
-function drawOrbs() {
-
-    orbs.forEach(orb => {
-
-        if (
-            orb.collected
-        ) {
-
-            return;
-
-        }
+portals.forEach(
+    (portal, index) => {
 
         const pulse =
             Math.sin(
-                gameTime * .12 +
-                orb.pulse
-            ) * 1.5;
+                frame * .12 +
+                index
+            ) * 3;
 
+        ctx.save();
 
-        ctx.fillStyle =
-            "#ffd43b";
+        ctx.strokeStyle =
+            "#b45cff";
 
         ctx.shadowColor =
-            "#ffd43b";
+            "#b45cff";
 
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 20;
+
+        ctx.lineWidth = 3;
 
         ctx.beginPath();
 
         ctx.arc(
-            orb.x,
-            orb.y,
-            orb.radius +
-                pulse,
+            portal.x,
+            portal.y,
+            9 + pulse,
             0,
             Math.PI * 2
         );
 
-        ctx.fill();
-
-        ctx.shadowBlur = 0;
-
-    });
-
-
-    powerUps.forEach(power => {
-
-        if (
-            power.collected
-        ) {
-
-            return;
-
-        }
-
-        const pulse =
-            Math.sin(
-                gameTime * .1 +
-                power.pulse
-            ) * 3;
-
-
-        ctx.save();
-
-        ctx.translate(
-            power.x,
-            power.y
-        );
-
-        ctx.rotate(
-            gameTime * .03
-        );
-
-        ctx.shadowColor =
-            "#29e7ff";
-
-        ctx.shadowBlur = 20;
-
-        ctx.fillStyle =
-            "#29e7ff";
-
-        ctx.beginPath();
-
-        ctx.moveTo(
-            0,
-            -12 - pulse
-        );
-
-        ctx.lineTo(
-            10 + pulse,
-            0
-        );
-
-        ctx.lineTo(
-            0,
-            12 + pulse
-        );
-
-        ctx.lineTo(
-            -10 - pulse,
-            0
-        );
-
-        ctx.closePath();
-
-        ctx.fill();
+        ctx.stroke();
 
         ctx.restore();
 
-    });
+    }
+);
 
 }
 
+/* =========================================================
+DESENHAR ITENS
+========================================================= */
 
-/* =====================================================
-   HUD
-===================================================== */
+function drawItems() {
+
+for (const pellet of pellets) {
+
+    if (pellet.collected) {
+        continue;
+    }
+
+    const pulse =
+        Math.sin(
+            frame * .12 +
+            pellet.phase
+        ) * 1.2;
+
+    ctx.fillStyle = "#ffd447";
+
+    ctx.shadowColor = "#ffd447";
+    ctx.shadowBlur = 8;
+
+    ctx.beginPath();
+
+    ctx.arc(
+        pellet.x,
+        pellet.y,
+        3.5 + pulse,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+
+}
+
+for (const power of powerUps) {
+
+    if (power.collected) {
+        continue;
+    }
+
+    const pulse =
+        Math.sin(
+            frame * .1 +
+            power.phase
+        ) * 2;
+
+    ctx.save();
+
+    ctx.translate(
+        power.x,
+        power.y
+    );
+
+    ctx.rotate(
+        frame * .025
+    );
+
+    ctx.fillStyle = "#24e6ff";
+
+    ctx.shadowColor = "#24e6ff";
+    ctx.shadowBlur = 20;
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        0,
+        -11 - pulse
+    );
+
+    ctx.lineTo(
+        9 + pulse,
+        0
+    );
+
+    ctx.lineTo(
+        0,
+        11 + pulse
+    );
+
+    ctx.lineTo(
+        -9 - pulse,
+        0
+    );
+
+    ctx.closePath();
+
+    ctx.fill();
+
+    ctx.restore();
+
+}
+
+}
+
+/* =========================================================
+HUD
+========================================================= */
 
 function updateHUD() {
 
-    score1.textContent =
-        String(
-            player1.score
-        ).padStart(
-            6,
-            "0"
-        );
+score1Element.textContent =
+    String(
+        player1.score
+    ).padStart(6, "0");
 
-    score2.textContent =
-        String(
-            player2.score
-        ).padStart(
-            6,
-            "0"
-        );
+score2Element.textContent =
+    String(
+        player2.score
+    ).padStart(6, "0");
 
+lives1Element.textContent =
+    player1.lives > 0
+        ? "♥ ".repeat(player1.lives)
+        : "SEM VIDAS";
 
-    lives1.textContent =
-        "❤️ ".repeat(
-            Math.max(
-                player1.lives,
-                0
-            )
-        );
+lives2Element.textContent =
+    player2.lives > 0
+        ? "♥ ".repeat(player2.lives)
+        : "SEM VIDAS";
 
+if (
+    player1.powerTimer > 0
+) {
 
-    lives2.textContent =
-        "❤️ ".repeat(
-            Math.max(
-                player2.lives,
-                0
-            )
-        );
+    statusElement.textContent =
+        "PLAYER 1 ESTÁ PODEROSO!";
 
+} else if (
+    player2.powerTimer > 0
+) {
 
-    if (
-        player1.powerTimer > 0
-    ) {
+    statusElement.textContent =
+        "PLAYER 2 ESTÁ PODEROSO!";
 
-        statusText.textContent =
-            "PLAYER 1: PODER ATIVO!";
+} else {
 
-    }
-
-    else if (
-        player2.powerTimer > 0
-    ) {
-
-        statusText.textContent =
-            "PLAYER 2: PODER ATIVO!";
-
-    }
-
-    else {
-
-        statusText.textContent =
-            `ORBES RESTANTES: ${remainingOrbs}`;
-
-    }
+    statusElement.textContent =
+        `ITENS RESTANTES: ${remainingItems}`;
 
 }
 
+}
 
-/* =====================================================
-   VERIFICAR VITÓRIA
-===================================================== */
+/* =========================================================
+VITÓRIA
+========================================================= */
 
 function checkVictory() {
 
-    if (
-        remainingOrbs > 0
-    ) {
+if (
+    remainingItems > 0
+) {
+    return;
+}
 
-        return false;
+if (gameOver) {
+    return;
+}
 
-    }
+gameOver = true;
 
-    gameRunning = false;
+let winnerText;
 
-    messageIcon.textContent =
-        "🏆";
+if (
+    player1.score >
+    player2.score
+) {
 
-    messageTitle.textContent =
-        "FASE CONCLUÍDA!";
+    winnerText =
+        "PLAYER 1 TERMINOU NA FRENTE!";
 
-    const winner =
-        player1.score >
-        player2.score
-            ? "PLAYER 1"
-            : player2.score >
-              player1.score
-                ? "PLAYER 2"
-                : "EMPATE";
+} else if (
+    player2.score >
+    player1.score
+) {
 
-    messageText.textContent =
-        `${winner} terminou com mais pontos!`;
+    winnerText =
+        "PLAYER 2 TERMINOU NA FRENTE!";
 
-    messageButton.textContent =
-        "PRÓXIMA FASE";
+} else {
 
-    message.classList.remove(
-        "hidden"
-    );
-
-    playSound(
-        800,
-        .15,
-        "sine"
-    );
-
-    return true;
+    winnerText =
+        "OS DOIS TERMINARAM EMPATADOS!";
 
 }
 
+resultIcon.textContent = "🏆";
 
-/* =====================================================
-   GAME OVER
-===================================================== */
+resultTitle.textContent =
+    "FASE CONCLUÍDA!";
+
+resultText.textContent =
+    winnerText;
+
+resultButton.textContent =
+    "JOGAR NOVAMENTE";
+
+overlay.classList.remove(
+    "hidden"
+);
+
+playTone(
+    800,
+    .18,
+    "sine"
+);
+
+}
+
+/* =========================================================
+GAME OVER
+========================================================= */
 
 function checkGameOver() {
 
-    if (
-        player1.alive ||
-        player2.alive
-    ) {
+if (
+    player1.alive ||
+    player2.alive
+) {
+    return;
+}
 
-        return;
+gameOver = true;
 
-    }
+resultIcon.textContent = "💀";
 
-    gameRunning = false;
+resultTitle.textContent =
+    "GAME OVER";
 
-    messageIcon.textContent =
-        "💀";
+resultText.textContent =
+    "Os dois jogadores perderam todas as vidas.";
 
-    messageTitle.textContent =
-        "GAME OVER";
+resultButton.textContent =
+    "TENTAR NOVAMENTE";
 
-    messageText.textContent =
-        "Os dois jogadores foram derrotados.";
-
-    messageButton.textContent =
-        "TENTAR NOVAMENTE";
-
-    message.classList.remove(
-        "hidden"
-    );
+overlay.classList.remove(
+    "hidden"
+);
 
 }
 
+/* =========================================================
+SOM
+========================================================= */
 
-/* =====================================================
-   ATUALIZAÇÃO
-===================================================== */
+function playTone(
+frequency,
+duration,
+type = "sine"
+) {
+
+try {
+
+    if (!audioContext) {
+
+        audioContext =
+            new (
+                window.AudioContext ||
+                window.webkitAudioContext
+            )();
+
+    }
+
+    if (
+        audioContext.state === "suspended"
+    ) {
+
+        audioContext.resume();
+
+    }
+
+    const oscillator =
+        audioContext.createOscillator();
+
+    const gain =
+        audioContext.createGain();
+
+    oscillator.type = type;
+
+    oscillator.frequency.setValueAtTime(
+        frequency,
+        audioContext.currentTime
+    );
+
+    gain.gain.setValueAtTime(
+        .045,
+        audioContext.currentTime
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+        .001,
+        audioContext.currentTime +
+        duration
+    );
+
+    oscillator.connect(gain);
+
+    gain.connect(
+        audioContext.destination
+    );
+
+    oscillator.start();
+
+    oscillator.stop(
+        audioContext.currentTime +
+        duration
+    );
+
+} catch (error) {
+
+    /* O áudio é opcional.
+       O jogo continua normalmente. */
+
+}
+
+}
+
+/* =========================================================
+RESET
+========================================================= */
+
+function resetGame() {
+
+gameOver = false;
+
+level = 1;
+
+levelElement.textContent =
+    `FASE ${level}`;
+
+particles = [];
+
+player1.score = 0;
+player1.lives = 3;
+player1.alive = true;
+player1.powerTimer = 0;
+
+player2.score = 0;
+player2.lives = 3;
+player2.alive = true;
+player2.powerTimer = 0;
+
+player1.resetPosition();
+player2.resetPosition();
+
+buildMap();
+
+createEnemies();
+
+overlay.classList.add(
+    "hidden"
+);
+
+updateHUD();
+
+}
+
+/* =========================================================
+LOOP PRINCIPAL
+========================================================= */
 
 function update() {
 
-    gameTime++;
+if (gameOver) {
+    return;
+}
 
-    player1.update({
+frame++;
 
-        up: "KeyW",
+player1.update({
 
-        down: "KeyS",
+    up: "KeyW",
+    down: "KeyS",
+    left: "KeyA",
+    right: "KeyD"
 
-        left: "KeyA",
+});
 
-        right: "KeyD"
+player2.update({
 
-    });
+    up: "ArrowUp",
+    down: "ArrowDown",
+    left: "ArrowLeft",
+    right: "ArrowRight"
 
+});
 
-    player2.update({
+for (const enemy of enemies) {
 
-        up: "ArrowUp",
-
-        down: "ArrowDown",
-
-        left: "ArrowLeft",
-
-        right: "ArrowRight"
-
-    });
-
-
-    enemies.forEach(
-        enemy =>
-            enemy.update()
-    );
-
-
-    updateParticles();
-
-    updateHUD();
-
-    checkVictory();
+    enemy.update();
 
 }
 
+updateParticles();
 
-/* =====================================================
-   DESENHAR
-===================================================== */
+updateHUD();
+
+checkVictory();
+
+}
 
 function draw() {
 
-    drawBackground();
+drawBackground();
 
-    drawMap();
+drawMap();
 
-    drawOrbs();
+drawItems();
 
-    enemies.forEach(
-        enemy =>
-            enemy.draw()
-    );
+for (const enemy of enemies) {
 
-    player1.draw();
-
-    player2.draw();
-
-    drawParticles();
+    enemy.draw();
 
 }
 
+player1.draw();
 
-/* =====================================================
-   LOOP
-===================================================== */
+player2.draw();
+
+drawParticles();
+
+}
 
 function gameLoop() {
 
-    if (
-        gameRunning
-    ) {
+update();
 
-        update();
+draw();
 
-    }
-
-    draw();
-
-    requestAnimationFrame(
-        gameLoop
-    );
+requestAnimationFrame(
+    gameLoop
+);
 
 }
 
-
-/* =====================================================
-   SOM
-===================================================== */
-
-let audioContext = null;
-
-function playSound(
-    frequency,
-    duration,
-    type
-) {
-
-    try {
-
-        if (!audioContext) {
-
-            audioContext =
-                new (
-                    window.AudioContext ||
-                    window.webkitAudioContext
-                )();
-
-        }
-
-
-        const oscillator =
-            audioContext.createOscillator();
-
-        const gain =
-            audioContext.createGain();
-
-
-        oscillator.type =
-            type;
-
-        oscillator.frequency.value =
-            frequency;
-
-
-        gain.gain.setValueAtTime(
-            .06,
-            audioContext.currentTime
-        );
-
-        gain.gain.exponentialRampToValueAtTime(
-            .001,
-            audioContext.currentTime +
-                duration
-        );
-
-
-        oscillator.connect(gain);
-
-        gain.connect(
-            audioContext.destination
-        );
-
-
-        oscillator.start();
-
-        oscillator.stop(
-            audioContext.currentTime +
-                duration
-        );
-
-    } catch (error) {
-
-        /* O jogo continua funcionando
-           mesmo se o navegador bloquear áudio. */
-
-    }
-
-}
-
-
-/* =====================================================
-   REINICIAR
-===================================================== */
-
-function restartGame() {
-
-    player1.score = 0;
-
-    player2.score = 0;
-
-    player1.lives = 3;
-
-    player2.lives = 3;
-
-    player1.alive = true;
-
-    player2.alive = true;
-
-    player1.powerTimer = 0;
-
-    player2.powerTimer = 0;
-
-    player1.resetPosition();
-
-    player2.resetPosition();
-
-    particles = [];
-
-    buildMap();
-
-    createEnemies();
-
-    gameRunning = true;
-
-    message.classList.add(
-        "hidden"
-    );
-
-    statusText.textContent =
-        "COLETE TODOS OS ORBES!";
-
-}
-
-
-/* =====================================================
-   BOTÕES
-===================================================== */
+/* =========================================================
+BOTÕES
+========================================================= */
 
 restartButton.addEventListener(
-    "click",
-    restartGame
+"click",
+function () {
+
+    resetGame();
+
+}
+
 );
 
+resultButton.addEventListener(
+"click",
+function () {
 
-messageButton.addEventListener(
-    "click",
-    () => {
+    resetGame();
 
-        if (
-            remainingOrbs === 0
-        ) {
+}
 
-            level++;
-
-            levelText.textContent =
-                `FASE ${level}`;
-
-        }
-
-        restartGame();
-
-    }
 );
 
-
-/* =====================================================
-   INICIALIZAÇÃO
-===================================================== */
+/* =========================================================
+INICIALIZAÇÃO
+========================================================= */
 
 buildMap();
 
@@ -2349,4 +2011,7 @@ player1.resetPosition();
 
 player2.resetPosition();
 
+updateHUD();
+
 gameLoop();
+

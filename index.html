@@ -1,219 +1,190 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
+<!DOCTYPE html> <html lang="pt-BR"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Maze Duo</title>
 
-<head>
-    <meta charset="UTF-8">
+<link rel="stylesheet" href="style.css">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+</head> <body>
+<div class="game-page">
 
-    <title>Maze Hunters - 2 Players</title>
+    <header class="header">
 
-    <link rel="stylesheet" href="style.css">
-</head>
+        <div class="brand">
+            <div class="brand-icon">●</div>
 
-<body>
+            <div>
+                <h1>NEON MAZE</h1>
+                <p>DUO ARCADE</p>
+            </div>
+        </div>
 
-    <div class="game">
+        <button id="restartBtn" class="restart-btn">
+            ↻ REINICIAR
+        </button>
 
-        <header class="top-bar">
+    </header>
 
-            <div class="logo">
-                <span class="logo-icon">◉</span>
 
-                <div>
-                    <h1>MAZE HUNTERS</h1>
-                    <p>DUO ARCADE</p>
-                </div>
+    <section class="hud">
+
+        <div class="player-panel red-panel">
+
+            <div class="player-name">
+                <span class="dot red"></span>
+                PLAYER 1
             </div>
 
-            <button id="restartButton">
-                ↻ REINICIAR
-            </button>
+            <div id="score1" class="score">
+                000000
+            </div>
 
-        </header>
+            <div id="lives1" class="lives">
+                ♥ ♥ ♥
+            </div>
+
+        </div>
 
 
-        <section class="score-board">
+        <div class="center-panel">
 
-            <div class="player-card player-one">
+            <div id="levelText">
+                FASE 1
+            </div>
 
-                <div class="player-title">
-                    <span class="player-dot red"></span>
-                    PLAYER 1
+            <div id="statusText">
+                COLETE TODOS OS ORBES
+            </div>
+
+        </div>
+
+
+        <div class="player-panel blue-panel">
+
+            <div class="player-name">
+                <span class="dot blue"></span>
+                PLAYER 2
+            </div>
+
+            <div id="score2" class="score">
+                000000
+            </div>
+
+            <div id="lives2" class="lives">
+                ♥ ♥ ♥
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <main class="game-shell">
+
+        <canvas
+            id="gameCanvas"
+            width="896"
+            height="640"
+        ></canvas>
+
+
+        <div id="overlay" class="overlay hidden">
+
+            <div class="result-box">
+
+                <div id="resultIcon" class="result-icon">
+                    🏆
                 </div>
 
-                <div
-                    id="score1"
-                    class="score"
+                <h2 id="resultTitle">
+                    VITÓRIA!
+                </h2>
+
+                <p id="resultText">
+                    Você venceu!
+                </p>
+
+                <button
+                    id="resultBtn"
+                    class="result-btn"
                 >
-                    000000
-                </div>
-
-                <div
-                    id="lives1"
-                    class="lives"
-                >
-                    ❤️ ❤️ ❤️
-                </div>
+                    JOGAR NOVAMENTE
+                </button>
 
             </div>
 
+        </div>
 
-            <div class="center-status">
+    </main>
 
-                <div id="level">
-                    FASE 1
-                </div>
 
-                <div id="status">
-                    COLETE TODOS OS ORBES!
-                </div>
+    <section class="instructions">
 
+        <div class="control-card red-card">
+
+            <strong>PLAYER 1</strong>
+
+            <div class="key-row">
+                <span>W</span>
             </div>
 
-
-            <div class="player-card player-two">
-
-                <div class="player-title">
-                    <span class="player-dot blue"></span>
-                    PLAYER 2
-                </div>
-
-                <div
-                    id="score2"
-                    class="score"
-                >
-                    000000
-                </div>
-
-                <div
-                    id="lives2"
-                    class="lives"
-                >
-                    ❤️ ❤️ ❤️
-                </div>
-
+            <div class="key-row">
+                <span>A</span>
+                <span>S</span>
+                <span>D</span>
             </div>
 
-        </section>
+            <small>
+                Movimento
+            </small>
+
+        </div>
 
 
-        <main class="game-area">
+        <div class="tips">
 
-            <canvas
-                id="gameCanvas"
-                width="960"
-                height="640"
-            ></canvas>
-
-
-            <div
-                id="message"
-                class="message hidden"
-            >
-
-                <div class="message-box">
-
-                    <div
-                        id="messageIcon"
-                        class="message-icon"
-                    >
-                        🏆
-                    </div>
-
-                    <h2 id="messageTitle">
-                        VITÓRIA!
-                    </h2>
-
-                    <p id="messageText">
-                        Todos os orbes foram coletados.
-                    </p>
-
-                    <button id="messageButton">
-                        CONTINUAR
-                    </button>
-
-                </div>
-
+            <div>
+                <b>●</b> Orb +10
             </div>
 
-        </main>
-
-
-        <section class="controls">
-
-            <div class="control-box">
-
-                <div class="control-title red-text">
-                    PLAYER 1
-                </div>
-
-                <div class="keys">
-                    <span>W</span>
-                    <span>A</span>
-                    <span>S</span>
-                    <span>D</span>
-                </div>
-
-                <small>
-                    Movimento
-                </small>
-
+            <div>
+                <b>◆</b> Power +50
             </div>
 
-
-            <div class="game-info">
-
-                <div>
-                    🟡 Orb = +10
-                </div>
-
-                <div>
-                    🔷 Power = +50
-                </div>
-
-                <div>
-                    🌀 Portal
-                </div>
-
-                <div>
-                    👻 Inimigo
-                </div>
-
+            <div>
+                <b>◉</b> Portal
             </div>
 
-
-            <div class="control-box">
-
-                <div class="control-title blue-text">
-                    PLAYER 2
-                </div>
-
-                <div class="keys">
-
-                    <span>↑</span>
-                    <span>←</span>
-                    <span>↓</span>
-                    <span>→</span>
-
-                </div>
-
-                <small>
-                    Movimento
-                </small>
-
+            <div>
+                <b>✦</b> Derrote inimigos
             </div>
 
-        </section>
-
-    </div>
+        </div>
 
 
-    <script src="script.js"></script>
+        <div class="control-card blue-card">
 
-</body>
+            <strong>PLAYER 2</strong>
 
-</html>
+            <div class="key-row">
+                <span>↑</span>
+            </div>
+
+            <div class="key-row">
+                <span>←</span>
+                <span>↓</span>
+                <span>→</span>
+            </div>
+
+            <small>
+                Movimento
+            </small>
+
+        </div>
+
+    </section>
+
+</div>
+
+
+<script src="script.js"></script>
+
+</body> </html>
